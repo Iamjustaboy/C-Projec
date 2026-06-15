@@ -1,8 +1,15 @@
-"""Streamlit entrypoint for the enterprise RAG assistant."""
+"""Streamlit entrypoint for the enterprise RAG assistant.
+
+学习提示：
+这个文件只负责“页面交互”和“调用 RAG 服务”，不要把文档切分、
+向量库、模型调用等细节都写进来。这样前端页面和后端 RAG 流程能
+保持解耦，后续把 Streamlit 换成 FastAPI/React 时也更容易。
+"""
 
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Iterable
 
 import streamlit as st
 
@@ -17,8 +24,12 @@ EXAMPLE_QUESTIONS = [
     "年假申请需要提前多久提交？",
 ]
 
+UPLOAD_TYPES = ["txt", "md", "pdf"]
+
 
 def _render_source(document: object, index: int) -> None:
+    """Render one retrieved chunk so users can inspect the evidence."""
+
     metadata = getattr(document, "metadata", {})
     content = getattr(document, "page_content", "")
     source = metadata.get("source", "unknown")
@@ -28,14 +39,40 @@ def _render_source(document: object, index: int) -> None:
 
 
 def _display_path(path: Path) -> str:
+    """Show paths relative to the project root when possible."""
+
     try:
         return str(path.relative_to(PROJECT_ROOT))
     except ValueError:
         return str(path)
 
 
+def _safe_upload_name(filename: str) -> str:
+    """Normalize uploaded filenames before writing them to disk."""
+
+    raw_name = Path(filename).name
+    suffix = Path(raw_name).suffix.lower()
+    stem = Path(raw_name).stem.strip() or "uploaded"
+    safe_stem = "".join(char if char.isalnum() or char in {"-", "_"} else "_" for char in stem)
+    return f"{safe_stem}{suffix}"
+
+
+def _save_uploaded_files(uploaded_files: Iterable[object], upload_dir: Path) -> list[Path]:
+    """Persist uploaded files so the index builder can read them."""
+
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    saved_paths: list[Path] = []
+    for uploaded_file in uploaded_files:
+        filename = _safe_upload_name(getattr(uploaded_file, "name", "uploaded"))
+        target_path = upload_dir / filename
+        target_path.write_bytes(uploaded_file.getbuffer())
+        saved_paths.append(target_path)
+    return saved_paths
+
+
 def main() -> None:
     st.set_page_config(page_title="企业知识库助手", layout="wide")
+    # 所有环境变量和默认值都集中在 config.py，页面只读取 settings。
     settings = get_settings()
 
     st.title("企业知识库助手")
@@ -45,7 +82,8 @@ def main() -> None:
         st.header("运行配置")
         st.write(f"模型：`{settings.openai_model}`")
         st.write(f"Embedding：`{settings.embedding_model}`")
-        st.write(f"知识库目录：`{_display_path(settings.data_dir)}`")
+        st.write(f"示例目录：`{_display_path(settings.data_dir)}`")
+        st.write(f"上传目录：`{_display_path(settings.upload_dir)}`")
 
         selected_k = st.slider(
             "检索 Top-K",
@@ -55,6 +93,7 @@ def main() -> None:
             step=1,
         )
 
+        # Chroma 会把索引持久化到 vectorstore/，这里仅检查目录是否存在内容。
         ready = is_index_ready(settings.persist_dir)
         st.write("索引状态：" + ("已构建" if ready else "未构建"))
 
@@ -65,11 +104,35 @@ def main() -> None:
             if not settings.has_api_key:
                 st.error("缺少 OPENAI_API_KEY，无法调用 Embedding 模型。")
             else:
+                # force_rebuild=True 会删除旧索引并重新读取 data/sample_docs。
                 with st.spinner("正在读取文档并重建 Chroma 索引..."):
                     _, doc_count, chunk_count = build_vector_store(settings, force_rebuild=True)
                 st.success(f"索引已更新：{doc_count} 篇文档，{chunk_count} 个片段。")
 
+        st.divider()
+        st.header("上传知识库")
+        uploaded_files = st.file_uploader(
+            "上传 .txt / .md / .pdf 文档",
+            type=UPLOAD_TYPES,
+            accept_multiple_files=True,
+        )
+        if st.button("保存上传并重建索引", use_container_width=True):
+            if not uploaded_files:
+                st.warning("请先选择要上传的文档。")
+            elif not settings.has_api_key:
+                st.error("缺少 OPENAI_API_KEY，无法生成 Embedding 并重建索引。")
+            else:
+                saved_paths = _save_uploaded_files(uploaded_files, settings.upload_dir)
+                with st.spinner("正在保存上传文档并重建 Chroma 索引..."):
+                    _, doc_count, chunk_count = build_vector_store(settings, force_rebuild=True)
+                saved_names = "、".join(path.name for path in saved_paths)
+                st.success(
+                    f"已保存 {len(saved_paths)} 个文档：{saved_names}。"
+                    f"索引已更新：{doc_count} 篇文档，{chunk_count} 个片段。"
+                )
+
     if "active_question" not in st.session_state:
+        # session_state 用来保存用户点击示例问题后的当前问题。
         st.session_state.active_question = ""
 
     st.subheader("示例问题")
@@ -94,6 +157,7 @@ def main() -> None:
 
         try:
             with st.spinner("正在检索知识库并生成回答..."):
+                # 首次运行没有索引时会自动构建；已有索引时直接加载。
                 vector_store, created = get_or_create_vector_store(settings)
                 result = answer_question(
                     active_question,
@@ -115,6 +179,7 @@ def main() -> None:
 
         st.chat_message("assistant").write(result["answer"])
         st.subheader("引用来源")
+        # 展示来源是 RAG 项目的核心价值：用户能核对答案来自哪些资料。
         for index, document in enumerate(result["sources"], start=1):
             _render_source(document, index)
 

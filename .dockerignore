@@ -1,0 +1,13 @@
+.git
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.env
+vectorstore
+data/uploaded_docs/*
+!data/uploaded_docs/.gitkeep
+render_resume_before
+render_resume_after
+render_resume_quicklook
+*.docx

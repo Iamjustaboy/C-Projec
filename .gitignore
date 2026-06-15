@@ -10,6 +10,9 @@ __pycache__/
 # Generated local vector index
 vectorstore/
 
+# Runtime uploaded knowledge-base files
+data/uploaded_docs/*
+!data/uploaded_docs/.gitkeep
+
 # Streamlit local secrets
 .streamlit/secrets.toml
-
