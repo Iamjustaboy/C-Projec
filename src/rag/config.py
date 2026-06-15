@@ -33,17 +33,17 @@ class RAGSettings:
     chunk_size/chunk_overlap: 文本切分大小和重叠长度。
     """
 
-    data_dir: Path
+    data_dir: Path        # 知识库文档存放的目录
     upload_dir: Path
-    persist_dir: Path
-    collection_name: str
+    persist_dir: Path        # 向量库本地保存的目录
+    collection_name: str        # Chroma 向量库的集合名称
     openai_api_key: str
     openai_model: str
-    embedding_model: str
-    top_k: int
-    chunk_size: int
-    chunk_overlap: int
-    temperature: float
+    embedding_model: str        # 文本转向量用的模型
+    top_k: int                # 检索时返回多少段相关文档
+    chunk_size: int            # 长文档切分后每段的大小（字数）
+    chunk_overlap: int            # 相邻文档片段的重叠字数（防止语义切断）
+    temperature: float            # 大模型温度（越低越严谨，越高越有创意）
 
     @property
     def has_api_key(self) -> bool:
