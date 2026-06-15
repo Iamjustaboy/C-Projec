@@ -1,0 +1,65 @@
+"""Configuration helpers for the RAG demo."""
+
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from pathlib import Path
+
+try:
+    from dotenv import load_dotenv
+except ImportError:  # pragma: no cover - dependency is installed in the app env.
+    def load_dotenv(*_: object, **__: object) -> bool:
+        return False
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+@dataclass(frozen=True)
+class RAGSettings:
+    """Runtime settings loaded from environment variables."""
+
+    data_dir: Path
+    persist_dir: Path
+    collection_name: str
+    openai_api_key: str
+    openai_model: str
+    embedding_model: str
+    top_k: int
+    chunk_size: int
+    chunk_overlap: int
+    temperature: float
+
+    @property
+    def has_api_key(self) -> bool:
+        return bool(self.openai_api_key.strip())
+
+
+def _int_env(name: str, default: int) -> int:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    try:
+        return int(raw_value)
+    except ValueError:
+        return default
+
+
+def get_settings() -> RAGSettings:
+    """Load settings from `.env` and process environment variables."""
+
+    load_dotenv(PROJECT_ROOT / ".env")
+    return RAGSettings(
+        data_dir=Path(os.getenv("RAG_DATA_DIR", PROJECT_ROOT / "data" / "sample_docs")),
+        persist_dir=Path(os.getenv("RAG_VECTORSTORE_DIR", PROJECT_ROOT / "vectorstore")),
+        collection_name=os.getenv("RAG_COLLECTION_NAME", "enterprise_knowledge_base"),
+        openai_api_key=os.getenv("OPENAI_API_KEY", ""),
+        openai_model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        embedding_model=os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small"),
+        top_k=_int_env("RAG_TOP_K", 4),
+        chunk_size=_int_env("RAG_CHUNK_SIZE", 900),
+        chunk_overlap=_int_env("RAG_CHUNK_OVERLAP", 160),
+        temperature=float(os.getenv("RAG_TEMPERATURE", "0.1")),
+    )
+
