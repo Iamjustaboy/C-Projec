@@ -45,9 +45,10 @@ def answer_question(
     from langchain_openai import ChatOpenAI
 
     llm = ChatOpenAI(
-        model=settings.openai_model,
+        model=settings.llm_model,
         temperature=settings.temperature,
-        api_key=settings.openai_api_key,
+        api_key=settings.llm_api_key,
+        base_url=settings.llm_base_url,
     )
     # 3. LCEL 管道：PromptTemplate -> ChatModel -> 字符串解析器。
     chain = build_prompt() | llm | StrOutputParser()

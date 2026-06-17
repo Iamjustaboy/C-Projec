@@ -80,7 +80,7 @@ def main() -> None:
 
     with st.sidebar:
         st.header("运行配置")
-        st.write(f"模型：`{settings.openai_model}`")
+        st.write(f"模型：`{settings.llm_model}`")
         st.write(f"Embedding：`{settings.embedding_model}`")
         st.write(f"示例目录：`{_display_path(settings.data_dir)}`")
         st.write(f"上传目录：`{_display_path(settings.upload_dir)}`")
@@ -98,11 +98,11 @@ def main() -> None:
         st.write("索引状态：" + ("已构建" if ready else "未构建"))
 
         if not settings.has_api_key:
-            st.warning("请先在 `.env` 中配置 `OPENAI_API_KEY`。")
+            st.warning("请先在 `.env` 中配置 `LLM_API_KEY`（DeepSeek API Key）。")
 
         if st.button("重建知识库索引", type="primary", use_container_width=True):
-            if not settings.has_api_key:
-                st.error("缺少 OPENAI_API_KEY，无法调用 Embedding 模型。")
+            if not settings.has_api_key and settings.embedding_provider == "openai":
+                st.error("缺少 API Key，无法调用 Embedding 模型。")
             else:
                 # force_rebuild=True 会删除旧索引并重新读取 data/sample_docs。
                 with st.spinner("正在读取文档并重建 Chroma 索引..."):
@@ -119,8 +119,8 @@ def main() -> None:
         if st.button("保存上传并重建索引", use_container_width=True):
             if not uploaded_files:
                 st.warning("请先选择要上传的文档。")
-            elif not settings.has_api_key:
-                st.error("缺少 OPENAI_API_KEY，无法生成 Embedding 并重建索引。")
+            elif not settings.has_api_key and settings.embedding_provider == "openai":
+                st.error("缺少 API Key，无法生成 Embedding 并重建索引。")
             else:
                 saved_paths = _save_uploaded_files(uploaded_files, settings.upload_dir)
                 with st.spinner("正在保存上传文档并重建 Chroma 索引..."):
@@ -151,7 +151,7 @@ def main() -> None:
 
         if not settings.has_api_key:
             st.chat_message("assistant").warning(
-                "缺少 `OPENAI_API_KEY`。配置 `.env` 后即可构建索引并生成回答。"
+                "缺少 `LLM_API_KEY`。配置 `.env` 后即可构建索引并生成回答。"
             )
             return
 

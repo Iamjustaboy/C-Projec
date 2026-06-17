@@ -17,17 +17,24 @@ from .loaders import load_documents_from_dirs, split_documents
 
 
 def create_embeddings(settings: RAGSettings) -> Any:
-    """Create the OpenAI embedding client used by Chroma.
+    """Create the embedding client used by Chroma.
 
-    Embedding 模型负责把文本片段转成向量。检索时，用户问题也会被转成
-    向量，再和库里的片段向量比较相似度。
+    默认使用 HuggingFace 本地模型（BAAI/bge-small-zh-v1.5），无需 API Key。
+    也可通过 EMBDEDDING_PROVIDER=openai 切换为 OpenAI 兼容的 Embedding API。
     """
 
-    from langchain_openai import OpenAIEmbeddings
+    if settings.embedding_provider == "openai":
+        from langchain_openai import OpenAIEmbeddings
 
-    return OpenAIEmbeddings(
-        model=settings.embedding_model,
-        api_key=settings.openai_api_key,
+        return OpenAIEmbeddings(
+            model=settings.embedding_model,
+            api_key=settings.llm_api_key,
+        )
+
+    from langchain_huggingface import HuggingFaceEmbeddings
+
+    return HuggingFaceEmbeddings(
+        model_name=settings.embedding_model,
     )
 
 

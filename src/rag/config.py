@@ -31,14 +31,25 @@ class RAGSettings:
     persist_dir: Chroma 向量库持久化目录。
     top_k: 每次提问时召回的知识片段数量。
     chunk_size/chunk_overlap: 文本切分大小和重叠长度。
+
+    LLM 相关配置（默认指向 DeepSeek API）：
+      llm_api_key   - API Key
+      llm_model     - 模型名称，如 deepseek-chat
+      llm_base_url  - API 地址，如 https://api.deepseek.com/v1
+
+    Embedding 相关配置：
+      embedding_provider - "huggingface"（默认）或 "openai"
+      embedding_model    - 模型名称或路径
     """
 
     data_dir: Path        # 知识库文档存放的目录
     upload_dir: Path
     persist_dir: Path        # 向量库本地保存的目录
     collection_name: str        # Chroma 向量库的集合名称
-    openai_api_key: str
-    openai_model: str
+    llm_api_key: str
+    llm_model: str
+    llm_base_url: str
+    embedding_provider: str        # "huggingface" | "openai"
     embedding_model: str        # 文本转向量用的模型
     top_k: int                # 检索时返回多少段相关文档
     chunk_size: int            # 长文档切分后每段的大小（字数）
@@ -47,7 +58,7 @@ class RAGSettings:
 
     @property
     def has_api_key(self) -> bool:
-        return bool(self.openai_api_key.strip())
+        return bool(self.llm_api_key.strip())
 
     @property
     def knowledge_dirs(self) -> list[Path]:
@@ -78,9 +89,11 @@ def get_settings() -> RAGSettings:
         upload_dir=Path(os.getenv("RAG_UPLOAD_DIR", PROJECT_ROOT / "data" / "uploaded_docs")),
         persist_dir=Path(os.getenv("RAG_VECTORSTORE_DIR", PROJECT_ROOT / "vectorstore")),
         collection_name=os.getenv("RAG_COLLECTION_NAME", "enterprise_knowledge_base"),
-        openai_api_key=os.getenv("OPENAI_API_KEY", ""),
-        openai_model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
-        embedding_model=os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small"),
+        llm_api_key=os.getenv("LLM_API_KEY", ""),
+        llm_model=os.getenv("LLM_MODEL", "deepseek-chat"),
+        llm_base_url=os.getenv("LLM_BASE_URL", "https://api.deepseek.com/v1"),
+        embedding_provider=os.getenv("EMBEDDING_PROVIDER", "huggingface"),
+        embedding_model=os.getenv("EMBEDDING_MODEL", "BAAI/bge-small-zh-v1.5"),
         top_k=_int_env("RAG_TOP_K", 4),
         chunk_size=_int_env("RAG_CHUNK_SIZE", 900),
         chunk_overlap=_int_env("RAG_CHUNK_OVERLAP", 160),
